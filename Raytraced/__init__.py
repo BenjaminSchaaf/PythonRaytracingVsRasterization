@@ -4,14 +4,18 @@ from module.objects import Renderer, Material
 import module
 from OpenGL.GL import *
 from OpenGL.GLU import *
-from OpenGL import GLX
-from OpenGL import WGL
+try:
+    from OpenGL import GLX
+    print "Using X (Unix) window system"
+except:
+    from OpenGL import WGL
+    print "Using Wiggle (windows) window system"
 import numpy
 import ctypes
 from ctypes import *
 #import PyOpenCL Objects
 from pyopencl import Buffer, Program, Context, CommandQueue, GLTexture
-#import PyOpenCL statics
+#import PyOpenCL enumberations
 from pyopencl import mem_flags, context_properties, platform_info
 #import dtypes
 from pyopencl.array import vec as cltypes
@@ -30,7 +34,7 @@ cltypes.Vertex = numpy.dtype([("position", cltypes.float4),
                               ("uv", cltypes.float2)])
 
 """
-   EXTENSION METHODS
+EXTENSION METHODS
 """
 #Set renderer specific object methods. Makes code cleaner
 
@@ -155,9 +159,9 @@ class Raytracer(Renderer):
         #link OpenGL context
         out.append((context_properties.GL_CONTEXT_KHR, platform.GetCurrentContext()))
         #link platform specific window contexts
-        if bool(GLX.glXGetCurrentDisplay):
+        if "GLX" in globals():
             out.append((context_properties.GLX_DISPLAY_KHR, GLX.glXGetCurrentDisplay()))
-        elif bool(WGL.wglGetCurrentDC):
+        if "WGL" in globals():
             out.append((context_properties.WGL_HDC_KHR, WGL.wglGetCurrentDC()))
 
         #return context properties
@@ -172,7 +176,7 @@ class Raytracer(Renderer):
         program = Program(self.context, source)
 
         #make program options
-        options = "-cl-mad-enable -cl-fast-relaxed-math -Werror -I " + os.path.dirname(os.path.abspath(__file__))
+        options = "-cl-mad-enable -cl-fast-relaxed-math -Werror -I %s" % os.path.dirname(os.path.abspath(__file__))
 
         #build program
         program.build(options=options)

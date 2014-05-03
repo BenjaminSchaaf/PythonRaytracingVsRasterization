@@ -176,7 +176,7 @@ __kernel void raytrace(__write_only image2d_t renderTexture,
     //texture size
     float2 size = (float2)(get_global_size(0), get_global_size(1));
     //uv coordinates
-    float2 npos = (float2)(pos.x/size.x, pos.y/size.y);
+    float2 npos = (float2)(pos.x/size.x - 0.5, pos.y/size.y - 0.5);
 
     Ray ray;
     ray.origin = camera.position;
