@@ -1,102 +1,10 @@
 #include <Math.cl>
-/*
-//Find the intersection distance between a ray and a plane
-//made from three poits
-
-
-//check the intersection between a ray and a triangle
-//place output data into the hit pointer
-
-
-RaycastHit* raycast(Ray* ray, int object_count, Object* objects[MAX_OBJECT_COUNT]) {
-    RaycastHit* hit = 0;
-    float dist = INFINITY;
-
-    for (int index = 0; index < object_count; index++) {
-        Mesh* mesh = objects[index]->mesh;
-        Object* object = objects[index];
-
-        for (int tris = 0; tris < mesh->triangle_count; tris++) {
-            float3 A = mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3], 0)).xyz;
-            float3 B = mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3 + 1], 0)).xyz;
-            float3 C = mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3 + 2], 0)).xyz;
-
-            float hitdist = ray_plane(ray, A, B, C);
-            if (hitdist < dist) {
-                RaycastHit hit2;
-                if (ray_triangle_check(ray, A, B, C, hitdist, &hit2)) {
-                    hit2.triangle_index = tris;
-                    hit2.object = objects[index];
-                    hit = &hit2;
-                }
-            }
-        }
-    }
-
-    return hit;
-}
-
-bool in_triangle(float3 point, float3 A, float3 B, float3 C) {
-    float area = magnitude(cross(B - A, C - A));
-
-    float3 QA = A - point;
-    float3 QB = B - point;
-    float3 QC = C - point;
-    float value = (magnitude(cross(QB, QC)) +
-                   magnitude(cross(QA, QC)) +
-                   magnitude(cross(QA, QB)))/area;
-    return round_float(value, 6) == 1;
-}
-
-void trace(__write_only image2d_t renderTexture,
-           int2 pos, float16 *projection_matrix,
-           int object_count, Object* objects[MAX_OBJECT_COUNT]) {
-    Ray ray;
-    ray.origin = mult_matrix(projection_matrix, (float4)(0, 0, 0, 1)).xyz;
-    ray.direction = mult_matrix(projection_matrix, (float4)((float)pos.x, (float)pos.y, 1, 0)).xyz;
-
-    RaycastHit* hit = raycast(&ray, object_count, objects);
-
-    if (hit) {
-        write_imagef(renderTexture, pos, (float4)(1, 0, 0, 1));
-    }
-    else {
-        write_imagef(renderTexture, pos, (float4)(0, 1, 0, 1));
-    }
-
-
-    if (hit) {
-        int iteration = 0;
-        float4 endColor = (float4)(0, 0, 0, 1);
-        float strength = 1;
-
-        while (hit && iteration < 4) {
-            float4 color;
-            //ambient
-            color = hit->object->material->emission + hit->object->material->ambient;
-
-            //lighting
-            float4 light = light_trace(hit->point + (float)0.00001*hit->normal, lights);
-            color += hit->object->material->diffuse;////////// *light;
-
-            endColor += color*strength;
-            if (false) { //reflection
-                hit = raycast(&ray, objects);
-            }
-            else {
-                break;
-            }
-            iteration += 1;
-        }
-        write_imagef(renderTexture, pos, endColor);
-    }*/
-//}
 
 //A vertex is made up of a position, a normal and a UV coordinate
 typedef struct {
     float4 position;
-    float4 normal;
-    float2 uv;
+//    float4 normal;
+//    float2 uv;
 } Vertex;
 
 //A camera is made up of it's position and it's orientation
@@ -121,26 +29,59 @@ typedef struct {
     float4 direction;
 } Ray;
 
-//Intersect a ray and a plane made of three points
-float ray_plane(Ray* ray, float4 A, float4 B, float4 C, Hit *hit) {
+float distance_from_ray_to_plane(Ray* ray, float4 A, float4 B, float4 C, Hit *hit);
+bool ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, float dist, Hit* hit);
+
+bool raycast(Ray* ray, __constant Vertex *vertices, int vertices_len, Hit *hit) {
+    hit->dist = INFINITY;
+
+    //Iterate through triangles
+    for (int index = 0; index < vertices_len; index += 3) {
+        //Get vertex coordiates of every triangle
+        float4 A = vertices[index + 0].position; //mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3], 0)).xyz;
+        float4 B = vertices[index + 1].position; //mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3 + 1], 0)).xyz;
+        float4 C = vertices[index + 2].position; //mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3 + 2], 0)).xyz;
+
+        //Get the hitdistace from the plane A, B, C
+        float dist = distance_from_ray_to_plane(ray, A, B, C, hit);
+
+        if (dist == INFINITY) {
+          continue;
+        }
+
+        if(dist < hit->dist) {
+            if (ray_triangle_check(ray, A, B, C, dist, hit)) {
+                hit->dist = dist;
+            }
+        }
+    }
+
+    //Return whether or not the ray hit anything
+    if (hit->dist == INFINITY) {
+        return false;
+    }
+
+    return true;
+}
+
+float distance_from_ray_to_plane(Ray* ray, float4 A, float4 B, float4 C, Hit *hit) {
     hit->normal = cross(C - A, B - A);
     float dotDirection = dot(hit->normal, ray->direction);
-    //Return the distance from the origin of the ray to the point of intersation
-    return -dot(A - ray->origin, hit->normal) / dotDirection; // < INFINITY
 
-    //Filter out planes facing the other direction (No 2 sided faces)
-    if (dotDirection > 0) {
-        return -dot(ray->origin, hit->normal + A) / dotDirection;
-    }
-    else {
+    if (dotDirection == 0) {
         return INFINITY;
     }
+
+    float dist = dot(A - ray->origin, hit->normal) / dotDirection;
+
+    return dist;
 }
 
 //Check whether an intersection point is inside the triangle A, B, C
 //Intersection point is dist along the ray.
-void ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, float dist, Hit* hit) {
-    hit->point = ray->origin + ray->direction*dist;
+bool ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, float dist, Hit* hit) {
+    hit->point = ray->origin + ray->direction * dist;
+
     float area = length(hit->normal);
 
     //Optimisation
@@ -152,66 +93,62 @@ void ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, float dist, Hit*
     hit->bary.x = length(cross(QB, QC))/area;
     hit->bary.y = length(cross(QA, QC))/area;
     hit->bary.z = length(cross(QA, QB))/area;
+
     //6 decimal precision. Not very good, but good enough
-    hit->bary.w = round_float(hit->bary.x + hit->bary.y + hit->bary.z, 6);
-    hit->dist = dist;
+    hit->bary.w = hit->bary.x + hit->bary.y + hit->bary.z;
+
     //Check for bary intersection
-    if (hit->bary.w == 1.0) {
-        hit->dist = dist;
-    }
-}
-
-bool raycast(Ray* ray, __constant Vertex *vertices, int vertices_len, Hit *hit) {
-    hit->dist = INFINITY;
-
-    //Iterate through triangles
-    for (int index = 0; index < vertices_len; index += 3) {
-        //Get vertex coordiates of every triangle
-        float4 A = vertices[index + 0].position;//mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3], 0)).xyz;
-        float4 B = vertices[index + 1].position;//mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3 + 1], 0)).xyz;
-        float4 C = vertices[index + 2].position;//mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3 + 2], 0)).xyz;
-
-        //Get the hitdistace from the plane A, B, C
-        float hitdist = ray_plane(ray, A, B, C, hit);
-
-        if (hitdist < hit->dist) {
-            //Check for triangle intersection
-            //ray_triangle_check(ray, A, B, C, hitdist, hit);
-            hit->dist = hitdist;
-        }
-    }
-
-    //Return whether or not the ray hit anything
-    if (hit->dist < INFINITY) {
+    float diff = fabs(1.0 - hit->bary.w);
+    if (diff < 0.000001) {
         return true;
     }
+
     return false;
 }
 
-__kernel void raytrace(__write_only image2d_t renderTexture,
-                       Camera camera,
-                       __constant Vertex *vertices, int vertices_len) {
-    //texture position
-    int2 pos = (int2)(get_global_id(0), get_global_id(1));
-    //texture size
-    float2 size = (float2)(get_global_size(0), get_global_size(1));
+
+
+__kernel void raytrace(__write_only image2d_t renderTexture, Camera camera, __constant Vertex *vertices, int vertices_len, __global float *res_g) {
+
+    int x = get_global_id(0);
+    int y = get_global_id(1);
+    int2 position = (int2)(x, y);
+
+    float width  = get_global_size(0);
+    float height = get_global_size(1);
     //uv coordinates
-    float2 npos = (float2)(pos.x/size.x - 0.5, pos.y/size.y - 0.5);
+
+    float normalised_x = x/width - 0.5;
+    float normalised_y = y/height - 0.5;
+
+    float2 normalised_pos = (float2)(normalised_x, normalised_y);
 
     Ray ray;
     ray.origin = camera.position;
-    ray.direction = camera.forward + npos.y*camera.up + npos.x*camera.right;
+    ray.direction = camera.forward + normalised_y*camera.up + normalised_x*camera.right;
 
-    float4 color = (float4)(0.0, 0.0, 0.0, 1.0);
+    float4 black = (float4)(0.0, 0.0, 0.0, 1.0);
+    float4 white = (float4)(1.0, 1.0, 1.0, 1.0);
+    float4 red   = (float4)(1.0, 0, 0, 0);
+
+    float4 color = black;
 
     Hit hit;
 
     //Do raytracing
     if (raycast(&ray, vertices, vertices_len, &hit)) {
-        color = (float4)(1.0, 1.0, 1.0, 1.0);
+        color = white;
+        res_g[x+y*(int)width] = 1;
+    }
+    else {
+        res_g[x+y*(int)width] = 0;
+    }
+
+    if (normalised_x == 0 || normalised_y == 0) {
+        color = red;
     }
 
     //color = (ray.direction + (float4)(1.0, 1.0, 1.0, 1.0))/2;
 
-    write_imagef(renderTexture, pos, color);
+    write_imagef(renderTexture, position, color);
 }

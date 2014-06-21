@@ -70,4 +70,3 @@ if __name__ == "__main__":
         pygame.quit()
         logging.exception("")
     pygame.quit()
-    raw_input()

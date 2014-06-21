@@ -182,7 +182,7 @@ class Raytracer(Renderer):
         program.build(options=options)
         self.kernel = program.raytrace
         self.kernel.set_scalar_arg_dtypes([None, None, None,
-                                           numpy.int32])
+                                           numpy.int32, None])
 
     def create_texture(self):
         #Grab the screen size
@@ -214,28 +214,30 @@ class Raytracer(Renderer):
                                         texture, 2)
 
     def create_buffers(self):
-        self.meshes_array = numpy.ndarray((0,), cltypes.Vertex)
         self.meshes_buffer = None
 
     def add_lights(self, lights): pass
 
     def add_objects(self, objects):
 
+        cltypes.Vertex, c_decl = OpenCL.tools.match_dtype_to_c_struct(self.context.devices[0], 'Vertex', cltypes.Vertex)
+        print c_decl, cltypes.Vertex,
         for object in objects:
             mesh = object.mesh
 
+            vertices = []
             for tri in mesh.triangles:
-                self.meshes_array = numpy.append(self.meshes_array,
-                                                 [list(mesh.vertices[tri]) + [0],
-                                                  list(mesh.normals[tri]) + [0],
-                                                  list(mesh.uv[tri])[:2]])
-            #self.mesh_splits_array = numpy.append(self.mesh_splits_array, len(self.meshes_array))
-            #self.mesh_matrices_array = numpy.append(self.mesh_matrices_array, object.get_matrix())
+                position = tuple(list(mesh.vertices[tri]) + [1.0])
+                #print position
+                #normal = tuple(list(mesh.normals[tri]) + [1.0])
+                #uv = tuple(list(mesh.uv[tri])[:2])
+                vertex = (position,) #, normal, uv)
+                vertices.append(vertex)
 
-        print len(self.meshes_array)/3
+        self.meshes_array = numpy.array(vertices, dtype=cltypes.Vertex)
+
         #Make buffers
-        self.meshes_buffer = Buffer(self.context, mem_flags.READ_ONLY | mem_flags.COPY_HOST_PTR,
-                                    hostbuf=self.meshes_array)
+        self.meshes_buffer = Buffer(self.context, mem_flags.READ_ONLY | mem_flags.COPY_HOST_PTR, hostbuf=self.meshes_array)
         #self.mesh_splits_buffer = Buffer(self.context, mem_flags.READ_ONLY | mem_flags.COPY_HOST_PTR,
         #                                 hostbuf=self.mesh_splits_array)
         #self.mesh_matrices_buffer = Buffer(self.context, mem_flags.READ_ONLY | mem_flags.COPY_HOST_PTR,
@@ -268,13 +270,22 @@ class Raytracer(Renderer):
         #Grab the global memory size (screen size)
         global_size = (self.width, self.height)
 
+        result = numpy.array([2] * self.width * self.height, dtype=numpy.float32)
+        result_buf = Buffer(self.context, 0, result.nbytes)
+
+
         #Execute OpenCL kernel with arguments
         if not len(self.meshes_array):
             return
         self.kernel(self.queue, global_size, None,
                     self.render_texture, camera_info,
                     self.meshes_buffer,
-                    len(self.meshes_array))
+                    len(self.meshes_array),
+                    result_buf)
+
+        c = numpy.empty_like(result)
+        OpenCL.enqueue_read_buffer(self.queue, result_buf, c).wait()
+        #print c[:144]
 
         #Wait for OpenCL to finish rendering
         self.queue.finish()

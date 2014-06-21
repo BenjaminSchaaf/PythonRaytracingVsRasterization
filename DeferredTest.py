@@ -53,7 +53,7 @@ def main():
         renderer.render(camera)
         
         if keydown:
-            camera.position += random_vector3()*0.2
+            camera.position += Vector(0.01, 0, 0);
         
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
