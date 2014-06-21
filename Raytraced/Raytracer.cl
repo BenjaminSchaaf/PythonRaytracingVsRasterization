@@ -92,12 +92,14 @@ void trace(__write_only image2d_t renderTexture,
     }*/
 //}
 
+//A vertex is made up of a position, a normal and a UV coordinate
 typedef struct {
     float4 position;
     float4 normal;
     float2 uv;
 } Vertex;
 
+//A camera is made up of it's position and it's orientation
 typedef struct {
     float4 position;
     float4 forward;
@@ -105,6 +107,7 @@ typedef struct {
     float4 right;
 } Camera;
 
+//A Ray-Hit point is made up of it's intersection point and information about it.
 typedef struct {
     float4 point;
     float4 normal;
@@ -112,16 +115,20 @@ typedef struct {
     float dist;
 } Hit;
 
+//A ray is simply a point and a direction
 typedef struct {
     float4 origin;
     float4 direction;
 } Ray;
 
+//Intersect a ray and a plane made of three points
 float ray_plane(Ray* ray, float4 A, float4 B, float4 C, Hit *hit) {
-    hit->normal = -cross(C - A, B - A);
+    hit->normal = cross(C - A, B - A);
     float dotDirection = dot(hit->normal, ray->direction);
-    return -dot(ray->origin, hit->normal + A) / dotDirection;
+    //Return the distance from the origin of the ray to the point of intersation
+    return -dot(A - ray->origin, hit->normal) / dotDirection; // < INFINITY
 
+    //Filter out planes facing the other direction (No 2 sided faces)
     if (dotDirection > 0) {
         return -dot(ray->origin, hit->normal + A) / dotDirection;
     }
@@ -130,18 +137,25 @@ float ray_plane(Ray* ray, float4 A, float4 B, float4 C, Hit *hit) {
     }
 }
 
+//Check whether an intersection point is inside the triangle A, B, C
+//Intersection point is dist along the ray.
 void ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, float dist, Hit* hit) {
     hit->point = ray->origin + ray->direction*dist;
     float area = length(hit->normal);
 
+    //Optimisation
     float4 QA = A - hit->point;
     float4 QB = B - hit->point;
     float4 QC = C - hit->point;
+
+    //Barycentric intersection test
     hit->bary.x = length(cross(QB, QC))/area;
     hit->bary.y = length(cross(QA, QC))/area;
     hit->bary.z = length(cross(QA, QB))/area;
+    //6 decimal precision. Not very good, but good enough
     hit->bary.w = round_float(hit->bary.x + hit->bary.y + hit->bary.z, 6);
     hit->dist = dist;
+    //Check for bary intersection
     if (hit->bary.w == 1.0) {
         hit->dist = dist;
     }
@@ -150,18 +164,24 @@ void ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, float dist, Hit*
 bool raycast(Ray* ray, __constant Vertex *vertices, int vertices_len, Hit *hit) {
     hit->dist = INFINITY;
 
+    //Iterate through triangles
     for (int index = 0; index < vertices_len; index += 3) {
+        //Get vertex coordiates of every triangle
         float4 A = vertices[index + 0].position;//mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3], 0)).xyz;
         float4 B = vertices[index + 1].position;//mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3 + 1], 0)).xyz;
         float4 C = vertices[index + 2].position;//mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3 + 2], 0)).xyz;
 
+        //Get the hitdistace from the plane A, B, C
         float hitdist = ray_plane(ray, A, B, C, hit);
 
         if (hitdist < hit->dist) {
-            ray_triangle_check(ray, A, B, C, hitdist, hit);
+            //Check for triangle intersection
+            //ray_triangle_check(ray, A, B, C, hitdist, hit);
+            hit->dist = hitdist;
         }
     }
 
+    //Return whether or not the ray hit anything
     if (hit->dist < INFINITY) {
         return true;
     }
@@ -186,6 +206,7 @@ __kernel void raytrace(__write_only image2d_t renderTexture,
 
     Hit hit;
 
+    //Do raytracing
     if (raycast(&ray, vertices, vertices_len, &hit)) {
         color = (float4)(1.0, 1.0, 1.0, 1.0);
     }
