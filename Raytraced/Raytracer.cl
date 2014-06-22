@@ -3,8 +3,8 @@
 //A vertex is made up of a position, a normal and a UV coordinate
 typedef struct {
     float4 position;
-//    float4 normal;
-//    float2 uv;
+    float4 normal;
+    float2 uv;
 } Vertex;
 
 //A camera is made up of it's position and it's orientation
@@ -29,8 +29,8 @@ typedef struct {
     float4 direction;
 } Ray;
 
-float distance_from_ray_to_plane(Ray* ray, float4 A, float4 B, float4 C, Hit *hit);
-bool ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, float dist, Hit* hit);
+void distance_from_ray_to_plane(Ray* ray, float4 A, float4 B, float4 C, Hit *hit);
+bool ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, Hit* hit);
 
 bool raycast(Ray* ray, __constant Vertex *vertices, int vertices_len, Hit *hit) {
     hit->dist = INFINITY;
@@ -43,44 +43,44 @@ bool raycast(Ray* ray, __constant Vertex *vertices, int vertices_len, Hit *hit) 
         float4 C = vertices[index + 2].position; //mult_matrix(&object->matrix, (float4)(*mesh->vertices[tris*3 + 2], 0)).xyz;
 
         //Get the hitdistace from the plane A, B, C
-        float dist = distance_from_ray_to_plane(ray, A, B, C, hit);
+        Hit plane_hit;
+        distance_from_ray_to_plane(ray, A, B, C, &plane_hit);
 
-        if (dist == INFINITY) {
+        if (plane_hit.dist == INFINITY) {
           continue;
         }
 
-        if(dist < hit->dist) {
-            if (ray_triangle_check(ray, A, B, C, dist, hit)) {
-                hit->dist = dist;
+        if(plane_hit.dist < hit->dist) {
+            if (ray_triangle_check(ray, A, B, C, &plane_hit)) {
+                *hit = plane_hit;
             }
         }
     }
 
     //Return whether or not the ray hit anything
-    if (hit->dist == INFINITY) {
+    if (isinf(hit->dist)) {
         return false;
     }
 
     return true;
 }
 
-float distance_from_ray_to_plane(Ray* ray, float4 A, float4 B, float4 C, Hit *hit) {
+void distance_from_ray_to_plane(Ray* ray, float4 A, float4 B, float4 C, Hit *hit) {
     hit->normal = cross(C - A, B - A);
     float dotDirection = dot(hit->normal, ray->direction);
 
     if (dotDirection == 0) {
-        return INFINITY;
+        hit->dist = INFINITY;
+        return;
     }
 
-    float dist = dot(A - ray->origin, hit->normal) / dotDirection;
-
-    return dist;
+    hit->dist = dot(A - ray->origin, hit->normal) / dotDirection;
 }
 
 //Check whether an intersection point is inside the triangle A, B, C
 //Intersection point is dist along the ray.
-bool ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, float dist, Hit* hit) {
-    hit->point = ray->origin + ray->direction * dist;
+bool ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, Hit* hit) {
+    hit->point = ray->origin + ray->direction * hit->dist;
 
     float area = length(hit->normal);
 
@@ -94,7 +94,6 @@ bool ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, float dist, Hit*
     hit->bary.y = length(cross(QA, QC))/area;
     hit->bary.z = length(cross(QA, QB))/area;
 
-    //6 decimal precision. Not very good, but good enough
     hit->bary.w = hit->bary.x + hit->bary.y + hit->bary.z;
 
     //Check for bary intersection
@@ -106,9 +105,7 @@ bool ray_triangle_check(Ray* ray, float4 A, float4 B, float4 C, float dist, Hit*
     return false;
 }
 
-
-
-__kernel void raytrace(__write_only image2d_t renderTexture, Camera camera, __constant Vertex *vertices, int vertices_len, __global float *res_g) {
+__kernel void raytrace(__write_only image2d_t renderTexture, Camera camera, __constant Vertex *vertices, int vertices_len) {
 
     int x = get_global_id(0);
     int y = get_global_id(1);
@@ -127,28 +124,14 @@ __kernel void raytrace(__write_only image2d_t renderTexture, Camera camera, __co
     ray.origin = camera.position;
     ray.direction = camera.forward + normalised_y*camera.up + normalised_x*camera.right;
 
-    float4 black = (float4)(0.0, 0.0, 0.0, 1.0);
-    float4 white = (float4)(1.0, 1.0, 1.0, 1.0);
-    float4 red   = (float4)(1.0, 0, 0, 0);
-
-    float4 color = black;
-
     Hit hit;
+    float4 color = BLACK;
 
     //Do raytracing
     if (raycast(&ray, vertices, vertices_len, &hit)) {
-        color = white;
-        res_g[x+y*(int)width] = 1;
+        float4 normal = normalize(hit.normal);
+        color = dot(normal, camera.forward) * WHITE + WHITE * 0.4;
     }
-    else {
-        res_g[x+y*(int)width] = 0;
-    }
-
-    if (normalised_x == 0 || normalised_y == 0) {
-        color = red;
-    }
-
-    //color = (ray.direction + (float4)(1.0, 1.0, 1.0, 1.0))/2;
 
     write_imagef(renderTexture, position, color);
 }
