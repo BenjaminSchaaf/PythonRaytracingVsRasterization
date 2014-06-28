@@ -95,8 +95,8 @@ class Rasterizer:
 
     def load_shaders(self):
         #Load shader objects from Hardcoded shader paths
-        vertex = Shader("Rasterized/shader.vert")
-        fragment = Shader("Rasterized/shader.frag")
+        vertex = Shader("rasterized/shader.vert")
+        fragment = Shader("rasterized/shader.frag")
 
         #Create program objects
         self.shader = ShaderProgram(vertex.id, fragment.id)
