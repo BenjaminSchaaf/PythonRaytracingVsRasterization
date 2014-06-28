@@ -1,4 +1,0 @@
-Problems:
-Getting something to render
-Data importing
-Data setting Order
