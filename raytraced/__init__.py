@@ -117,8 +117,8 @@ class Raytracer:
 
     def set_opengl(self):
         #create shader program
-        vertex_shader = Shader("Raytraced/vertex.vert")
-        fragment_shader = Shader("Raytraced/fragment.frag")
+        vertex_shader = Shader("raytraced/vertex.vert")
+        fragment_shader = Shader("raytraced/fragment.frag")
         self.draw_program = ShaderProgram(vertex_shader.id, fragment_shader.id)
 
         #create render quad
@@ -170,7 +170,7 @@ class Raytracer:
 
     def load_program(self):
         #Read all the lines of the cl file into one string (safely)
-        with open("Raytraced/Raytracer.cl", "r") as file:
+        with open("raytraced/Raytracer.cl", "r") as file:
             source = ''.join(file.readlines())
 
         #Create the opencl program
