@@ -1,6 +1,6 @@
 import pygame
 import os
-import module
+import common
 from OpenGL.GL import *
 from OpenGL.GLU import *
 try:
@@ -21,7 +21,7 @@ from pyopencl.array import vec as cltypes
 from pyopencl import tools as cltools
 import pyopencl as OpenCL
 import pyopencl.array as cl_array
-from module.pyopengl import *
+from common.pyopengl import *
 import itertools
 
 """
@@ -49,9 +49,9 @@ OpenCL.Device.meets_requirements = _pyopencl_Device__meets_requirements
 def _Camera__getCl_info(self):
     mat = self.rotation.matrix
     pos = self.position
-    forward = mat*module.math3d.Vector(0, 0, 1)
-    up = mat*module.math3d.Vector(0, 1, 0)
-    right = mat*module.math3d.Vector(1, 0, 0)
+    forward = mat*common.math3d.Vector(0, 0, 1)
+    up = mat*common.math3d.Vector(0, 1, 0)
+    right = mat*common.math3d.Vector(1, 0, 0)
     out = numpy.array(list(pos) + [0] +
                       list(forward) + [0] +
                       list(up) + [0] +
@@ -59,7 +59,7 @@ def _Camera__getCl_info(self):
                       dtype=numpy.float32)
     return numpy.ndarray((4, 4), numpy.float32, out)
 #Apply extension method
-module.objects.Camera.getCl_info = _Camera__getCl_info
+common.objects.Camera.getCl_info = _Camera__getCl_info
 
 #Extension method for Object objects
 #Sets transformation matrix
@@ -71,7 +71,7 @@ def _Object__get_matrix(self):
             rt[6], rt[7], rt[8], self.position[2],
             0,     0,     0,     1]
 #Apply extension method
-module.objects.Object.get_matrix = _Object__get_matrix
+common.objects.Object.get_matrix = _Object__get_matrix
 
 """
    MAIN CLASS

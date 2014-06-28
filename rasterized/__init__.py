@@ -1,10 +1,10 @@
 import pygame
 import OpenGL
-import module.objects
+import common.objects
 from OpenGL.GL import *
 from OpenGL.GL.ARB.framebuffer_object import *
 from OpenGL.GLU import *
-from module.pyopengl import *
+from common.pyopengl import *
 
 """
    EXTENTION METHODS
@@ -32,7 +32,7 @@ def _Mesh__generate_glList(self):
     #end defining a list object
     glEndList()
 #Apply extension method
-module.objects.Mesh.generate_glList = _Mesh__generate_glList
+common.objects.Mesh.generate_glList = _Mesh__generate_glList
 
 #Extension method for Camera objects
 #Sets projection matrix
@@ -55,7 +55,7 @@ def _Camera__apply_glMatrix(self):
     #Apply translation
     glTranslatef(*-self.position)
 #Apply extension method
-module.objects.Camera.apply_glMatrix = _Camera__apply_glMatrix
+common.objects.Camera.apply_glMatrix = _Camera__apply_glMatrix
 
 """
    MAIN CLASS

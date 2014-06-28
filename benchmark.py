@@ -5,8 +5,8 @@ import os, sys
 
 from rasterized import Rasterizer
 from raytraced import Raytracer
-from module import ObjImporter
-from module.objects import Camera
+from common import ObjImporter
+from common.objects import Camera
 import pygame
 
 RENDERERS = Rasterizer, Raytracer
