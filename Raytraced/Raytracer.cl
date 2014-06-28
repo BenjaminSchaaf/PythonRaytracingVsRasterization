@@ -4,7 +4,6 @@
 typedef struct {
     float4 position;
     float4 normal;
-    float2 uv;
 } Vertex;
 
 //A camera is made up of it's position and it's orientation
@@ -50,7 +49,7 @@ bool raycast(Ray* ray, __constant Vertex *vertices, int vertices_len, Hit *hit) 
           continue;
         }
 
-        if(plane_hit.dist < hit->dist) {
+        if(0 < plane_hit.dist && plane_hit.dist < hit->dist) {
             if (ray_triangle_check(ray, A, B, C, &plane_hit)) {
                 *hit = plane_hit;
             }
@@ -69,7 +68,7 @@ void distance_from_ray_to_plane(Ray* ray, float4 A, float4 B, float4 C, Hit *hit
     hit->normal = cross(C - A, B - A);
     float dotDirection = dot(hit->normal, ray->direction);
 
-    if (dotDirection == 0) {
+    if (dotDirection <= 0) {
         hit->dist = INFINITY;
         return;
     }
@@ -130,7 +129,7 @@ __kernel void raytrace(__write_only image2d_t renderTexture, Camera camera, __co
     //Do raytracing
     if (raycast(&ray, vertices, vertices_len, &hit)) {
         float4 normal = normalize(hit.normal);
-        color = dot(normal, camera.forward) * WHITE + WHITE * 0.4;
+        color = dot(normal, ray.direction) * WHITE + WHITE * 0.4;
     }
 
     write_imagef(renderTexture, position, color);

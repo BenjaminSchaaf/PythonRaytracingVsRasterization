@@ -1,6 +1,5 @@
 import pygame
 import os
-from module.objects import Renderer, Material
 import module
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -30,8 +29,7 @@ Structures
 """
 
 cltypes.Vertex = numpy.dtype([("position", cltypes.float4),
-                              ("normal", cltypes.float4),
-                              ("uv", cltypes.float2)])
+                              ("normal", cltypes.float4)])
 
 """
 EXTENSION METHODS
@@ -79,16 +77,16 @@ module.objects.Object.get_matrix = _Object__get_matrix
    MAIN CLASS
 """
 
-class Raytracer(Renderer):
+class Raytracer:
     """Raytraced Renderer"""
 
     """
        INITIALISATION
     """
-    def __init__(self, width, height):
+    def __init__(self, resolution, object):
         #initialize display
-        self.set_display(width, height)
-        self.width, self.height = width, height
+        self.set_display(resolution)
+        self.width, self.height = resolution
 
         #initialize opengl
         self.set_opengl()
@@ -105,13 +103,16 @@ class Raytracer(Renderer):
         #Create global OpenCL buffers
         self.create_buffers()
 
+        self.object = object
+        self.load_object()
+
         #print OpenGL Version
         print "Using OpenGL version: " + glGetString(GL_VERSION)
 
-    def set_display(self, width, height):
+    def set_display(self, resolution):
         #Create a pygame window
         pygame.display.init()
-        pygame.display.set_mode((width, height),
+        pygame.display.set_mode(resolution,
                                 pygame.OPENGL|pygame.DOUBLEBUF)
 
     def set_opengl(self):
@@ -219,29 +220,19 @@ class Raytracer(Renderer):
     def create_buffers(self):
         self.meshes_buffer = None
 
-    def add_lights(self, lights): pass
-
-    def add_objects(self, objects):
-        for object in objects:
-            mesh = object.mesh
-
-            vertices = []
-            for tri in mesh.triangles:
-                position = tuple(list(mesh.vertices[tri]) + [0.0])
-                #print position
-                normal = tuple(list(mesh.normals[tri]) + [0.0])
-                uv = tuple(list(mesh.uv[tri])[:2])
-                vertex = (position, normal, uv)
-                vertices.append(vertex)
+    def load_object(self):
+        vertices = []
+        for tri in self.object.triangles:
+            #Built vertex object
+            position = tuple(list(self.object.vertices[tri]) + [0.0])
+            normal = tuple(list(self.object.normals[tri]) + [0.0])
+            vertex = (position, normal)
+            vertices.append(vertex)
 
         self.meshes_array = numpy.array(vertices, dtype=cltypes.Vertex)
 
         #Make buffers
         self.meshes_buffer = Buffer(self.context, mem_flags.READ_ONLY | mem_flags.COPY_HOST_PTR, hostbuf=self.meshes_array)
-        #self.mesh_splits_buffer = Buffer(self.context, mem_flags.READ_ONLY | mem_flags.COPY_HOST_PTR,
-        #                                 hostbuf=self.mesh_splits_array)
-        #self.mesh_matrices_buffer = Buffer(self.context, mem_flags.READ_ONLY | mem_flags.COPY_HOST_PTR,
-        #                                   hostbuf=self.mesh_matrices_array)
 
     def render(self, camera):
         camera_info = camera.getCl_info()
@@ -271,8 +262,6 @@ class Raytracer(Renderer):
         global_size = (self.width, self.height)
 
         #Execute OpenCL kernel with arguments
-        if not len(self.meshes_array):
-            return
         self.kernel(self.queue, global_size, None,
                     self.render_texture, camera_info,
                     self.meshes_buffer,
@@ -298,7 +287,7 @@ class Raytracer(Renderer):
         #Render render-quad with texture to back-buffer
         glCallList(self.render_quad)
 
-    def close():
+    def close(self):
         #close the pygame window
         pygame.quit()
         #The rest should be handled by the OS and the hardware driver

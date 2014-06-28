@@ -23,6 +23,7 @@ def load(path):
         for obj in objs:
             obj = __parse_lines(obj)
             if obj:
+                obj.file = path
                 objects.append(obj)
 
     return objects
@@ -45,7 +46,6 @@ def __split_objects(lines):
 
 def __parse_lines(lines):
     verts = []
-    uvs = []
     norms = []
     tris = []
 
@@ -60,10 +60,6 @@ def __parse_lines(lines):
                 float(attributes[1]),
                 float(attributes[2]),
                 float(attributes[3])));
-        elif attributes[0] == "vt":
-            uvs.append(Vector(
-                float(attributes[1]),
-                float(attributes[2])));
         elif attributes[0] == "vn":
             norms.append(Vector(
                 float(attributes[1]),
@@ -89,32 +85,19 @@ def __parse_lines(lines):
 
     vertices = []
     normals = []
-    uv = []
 
-    triangledict = {}
     triangles = []
 
     index = 0
     for triangle in tris:
-        name = ''.join([str(int(triangle[0])), str(int(triangle[1])), str(int(triangle[2]))])
-        if name not in triangledict:
-            triangledict[name] = index
-            vertices.append(verts[int(triangle[0])])
-            if triangle[1] >= 0:
-                uv.append(uvs[int(triangle[1])])
-            else:
-                uv.append(Vector(0, 0))
-            if triangle[2] >= 0:
-                normals.append(norms[int(triangle[2])])
-            else:
-                normals.append(Vector(0, 0, 0))
-            index += 1
-        triangles.append(triangledict[name])
+        vertices.append(verts[int(triangle[0])])
+        normals.append(norms[int(triangle[2])])
+        triangles.append(index)
+        index += 1
 
     mesh = Mesh()
     mesh.vertices = tuple(vertices)
     mesh.normals = tuple(normals)
-    mesh.uv = tuple(uv)
     mesh.triangles = tuple(triangles)
 
     return mesh

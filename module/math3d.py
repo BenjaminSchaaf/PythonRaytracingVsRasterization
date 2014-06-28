@@ -20,6 +20,7 @@ class Vector():
     The Vectors dimension number is determined when it is created
     and stays constant for it's lifetime.
     """
+    __slows__ = ["_value"]
     def __init__(self, *args):
         """Makes a new Vector with either
         each vector component separately
@@ -127,16 +128,16 @@ class Vector():
     def __iter__(self):
         """Returns the iterator of the internal Tuple object"""
         return iter(self._value)
-    
+
     def __list__(self):
         return list(self._value)
-    
+
     def __tuple__(self):
         return tuple(self._value)
-    
+
     def __float__(self):
         return self.magnitude
-    
+
     def __int__(self):
         return len(self)
 
@@ -272,6 +273,7 @@ class Vector():
         raise DimentionMissmatchException()
 
 class Quaternion(object):
+    __slots__ = ["_value"]
     def __init__(self, *args):
         if len(args) == 4:
             self._value = (float(args[0]), float(args[1]), float(args[2]), float(args[3]))
