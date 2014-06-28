@@ -1,94 +1,42 @@
-#!/usr/bin/env python
-
 from __future__ import division
 
 import time
-import os, sys
-
-from rasterized import Rasterizer
-from raytraced import Raytracer
-from common import ObjImporter
-from common.objects import Camera
+import sys, os
 import pygame
 
-RENDERERS = Rasterizer, Raytracer
-RESOLUTIONS = [
-    (500, 500),
-]
-TEST_LENGTH = 20
+from common import ObjImporter
+from common.objects import Camera
+from rasterized import Rasterizer
+from raytraced import Raytracer
 
-def load_objects():
-    objects = []
+CAMERA = Camera()
+CAMERA.position[2] = -6
 
-    #Load all files from tests directory
-    for file in os.listdir("tests"):
-        objects += ObjImporter.load(os.path.join("tests", file))
+def main(renderer, test, duration = 20, width = 500, height = 500):
+    object = ObjImporter.load(os.path.join("tests", test))[0]
 
-    return objects
-
-def get_camera():
-    camera = Camera()
-    camera.position[2] = -6
-    return camera
-
-def main():
-    objects = load_objects()
-    camera = get_camera()
-
-    #Redirect stdout and stderr to nothing
-    devnull = open(os.devnull, 'w')
-    stdout = sys.stdout
-    sys.stdout = devnull
+    resolution = int(width), int(height)
+    renderer = {
+        "rasterized" : Rasterizer,
+        "raytraced" : Raytracer,
+    }[renderer](resolution, object)
 
     results = []
-    for renderer in RENDERERS:
-        renderer_results = []
+    start_time = time.time()
+    while time.time() - start_time < int(duration):
+        start = time.clock()
+        renderer.render(CAMERA)
+        fps = 1 / (time.clock() - start)
+        results.append(fps)
 
-        for object in objects:
-            for resolution in RESOLUTIONS:
-                instance = renderer(resolution, object)
-                #Warmup render
-                try:
-                    instance.render(camera)
-                except:
-                    renderer_results.append(None)
-                    continue
+        #Help pygame stay alive
+        pygame.event.get()
 
-                start_time = time.time()
-                object_times = []
-                while time.time() - start_time < TEST_LENGTH:
-                    #Test framerate
-                    start = time.clock()
-                    instance.render(camera)
-                    total = time.clock() - start
-                    fps = 1 / total
-                    #Add result
-                    object_times.append(fps)
-                    #Fix pygame shit
-                    pygame.event.get()
+    renderer.close()
 
-                average_fps = sum(object_times) / len(object_times)
-                renderer_results.append(average_fps)
-                instance.close()
-
-        results.append(renderer_results)
-
-    #Direct stdout back to stdout
-    sys.stdout = stdout
-    devnull.close()
-
-    #Print Results
-    for index in range(len(RENDERERS)):
-        renderer = RENDERERS[index]
-        print("Results for %s:" % renderer.__name__)
-        for result_index in range(len(results[index])):
-            result_name = objects[result_index].file
-            result = results[index][result_index]
-
-            if result is not None:
-                print("  %s: %s" % (result_name, result))
-            else:
-                print("  %s: FAIL!" % result_name)
+    #Return average
+    return sum(results) / len(results)
 
 if __name__ == "__main__":
-    main()
+    result = main(*sys.argv[1:])
+    print(result)
